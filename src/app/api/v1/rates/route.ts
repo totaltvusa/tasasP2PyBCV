@@ -4,8 +4,35 @@ import { MarketRatesData, P2POffer, P2PTradeSummary, RateItem } from '@/lib/type
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL', payTypes: string[] = []): Promise<P2PTradeSummary> {
+const PAY_TYPE_MAP: Record<string, string> = {
+  BNC: 'BNCBancoNacional',
+  BancoNacionalDeCredito: 'BNCBancoNacional',
+  BNCBancoNacional: 'BNCBancoNacional',
+  BancoDeVenezuela: 'BancoDeVenezuela',
+  BDV: 'BancoDeVenezuela',
+  PagoMovil: 'PagoMovil',
+  Banesco: 'Banesco',
+  Mercantil: 'Mercantil',
+  Provincial: 'Provincial',
+  BBVA: 'Provincial',
+  Bancamiga: 'Bancamiga',
+  Bancaribe: 'Bancaribe',
+  Banplus: 'Banplus',
+  BancoDelTesoro: 'BancoDelTesoro',
+  BancoPlaza: 'BancoPlaza',
+  BFC: 'BFC',
+  BancoActivo: 'BancoActivo',
+  Zinli: 'Zinli',
+};
+
+async function fetchBinanceP2P(
+  tradeType: 'BUY' | 'SELL',
+  payTypes: string[] = [],
+  allowFallback = true
+): Promise<P2PTradeSummary> {
   try {
+    const mappedPayTypes = payTypes.map((pt) => PAY_TYPE_MAP[pt] || pt);
+
     const payload = JSON.stringify({
       fiat: 'VES',
       page: 1,
@@ -19,8 +46,11 @@ async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL', payTypes: string[] = [
       periods: [],
       additionalKycVerifyFilter: 0,
       publisherType: null,
-      payTypes: payTypes.length > 0 ? payTypes : [],
+      payTypes: mappedPayTypes.length > 0 ? mappedPayTypes : [],
     });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const res = await fetch('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', {
       method: 'POST',
@@ -30,8 +60,11 @@ async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL', payTypes: string[] = [
         'Origin': 'https://p2p.binance.com',
       },
       body: payload,
+      signal: controller.signal,
       cache: 'no-store',
     });
+
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       throw new Error(`Binance P2P status error: ${res.status}`);
@@ -63,6 +96,17 @@ async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL', payTypes: string[] = [
     }
 
     const count = prices.length;
+
+    // If a specific filter was requested and 0 ads found, fallback to general market
+    if (count === 0 && mappedPayTypes.length > 0 && allowFallback) {
+      console.warn(`[P2P ${tradeType}] No ads for filter [${mappedPayTypes.join(',')}]. Falling back to general market.`);
+      const fallbackResult = await fetchBinanceP2P(tradeType, [], false);
+      return {
+        ...fallbackResult,
+        isFallback: true,
+      };
+    }
+
     const min = count > 0 ? Math.min(...prices) : 0;
     const max = count > 0 ? Math.max(...prices) : 0;
     const average = count > 0 ? prices.reduce((a, b) => a + b, 0) / count : 0;
@@ -73,15 +117,24 @@ async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL', payTypes: string[] = [
       max,
       count,
       topOffers: offers.slice(0, 8),
+      isFallback: false,
     };
   } catch (err: any) {
     console.warn(`[P2P Binance ${tradeType}] fetch warning:`, err.message);
+    if (payTypes.length > 0 && allowFallback) {
+      const fallbackResult = await fetchBinanceP2P(tradeType, [], false);
+      return {
+        ...fallbackResult,
+        isFallback: true,
+      };
+    }
     return {
       average: 0,
       min: 0,
       max: 0,
       count: 0,
       topOffers: [],
+      isFallback: true,
     };
   }
 }

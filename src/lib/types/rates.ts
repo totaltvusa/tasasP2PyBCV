@@ -24,6 +24,7 @@ export interface P2PTradeSummary {
   max: number;
   count: number;
   topOffers: P2POffer[];
+  isFallback?: boolean;
 }
 
 export interface MarketRatesData {

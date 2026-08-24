@@ -6,7 +6,7 @@ import {
   ShieldCheck, ArrowUpRight, ArrowDownLeft, Calculator,
   Building2, Landmark, Clock, Copy, Check, Sparkles,
   ExternalLink, Layers, Share2, HelpCircle, Filter,
-  ChevronDown, ChevronUp, CheckSquare, Square, X, SlidersHorizontal
+  ChevronDown, ChevronUp, CheckSquare, Square, X, SlidersHorizontal, AlertTriangle
 } from 'lucide-react';
 import { MarketRatesData } from '@/lib/types/rates';
 
@@ -16,10 +16,12 @@ const VENEZUELA_PAYMENT_METHODS = [
   { id: 'BancoDeVenezuela', name: 'Banco de Venezuela (BDV)', shortName: 'BDV', icon: '🔴' },
   { id: 'Mercantil', name: 'Mercantil', shortName: 'Mercantil', icon: '🔵' },
   { id: 'Provincial', name: 'BBVA Provincial', shortName: 'Provincial', icon: '🔷' },
-  { id: 'BNC', name: 'Banco Nacional de Crédito (BNC)', shortName: 'BNC', icon: '🏛️' },
+  { id: 'BNCBancoNacional', name: 'Banco Nacional de Crédito (BNC)', shortName: 'BNC', icon: '🏛️' },
+  { id: 'Bancamiga', name: 'Bancamiga', shortName: 'Bancamiga', icon: '💳' },
   { id: 'Bancaribe', name: 'Bancaribe', shortName: 'Bancaribe', icon: '🏦' },
-  { id: 'BFC', name: 'BFC Fondo Común', shortName: 'BFC', icon: '🏢' },
   { id: 'Banplus', name: 'Banplus', shortName: 'Banplus', icon: '💳' },
+  { id: 'BancoDelTesoro', name: 'Banco del Tesoro', shortName: 'Tesoro', icon: '🪙' },
+  { id: 'BFC', name: 'BFC Fondo Común', shortName: 'BFC', icon: '🏢' },
   { id: 'Zinli', name: 'Zinli', shortName: 'Zinli', icon: '⚡' },
 ];
 
@@ -484,13 +486,25 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
           <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/20 via-gray-900 to-gray-950 border border-amber-500/30 shadow-2xl space-y-6">
             
             {selectedPayTypes.length > 0 && (
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-300">
-                <span className="flex items-center space-x-1.5">
-                  <Filter className="w-3.5 h-3.5" />
-                  <span>Filtrando por: <strong>{selectedPayTypes.map(id => VENEZUELA_PAYMENT_METHODS.find(m => m.id === id)?.shortName || id).join(', ')}</strong></span>
-                </span>
-                <button onClick={clearPayTypes} className="text-[11px] underline font-bold">Ver todos</button>
-              </div>
+              currentP2PSummary?.isFallback ? (
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 gap-2 flex-wrap sm:flex-nowrap">
+                  <span className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      Sin órdenes activas para <strong>{selectedPayTypes.map(id => VENEZUELA_PAYMENT_METHODS.find(m => m.id === id)?.shortName || id).join(', ')}</strong> en Binance P2P. Mostrando <strong>promedio general del mercado</strong>.
+                    </span>
+                  </span>
+                  <button onClick={clearPayTypes} className="text-[11px] underline font-bold shrink-0 ml-auto">Ver todos</button>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-300">
+                  <span className="flex items-center space-x-1.5">
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Filtrando por: <strong>{selectedPayTypes.map(id => VENEZUELA_PAYMENT_METHODS.find(m => m.id === id)?.shortName || id).join(', ')}</strong></span>
+                  </span>
+                  <button onClick={clearPayTypes} className="text-[11px] underline font-bold">Ver todos</button>
+                </div>
+              )
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
