@@ -64,28 +64,42 @@ export default function RatesDashboardPage() {
   const numericAmount = parseFloat(calcAmount) || 0;
 
   const calcResults = useMemo(() => {
-    if (numericAmount <= 0) return { p2pResult: 0, bcvResult: 0, diff: 0 };
+    if (numericAmount <= 0) {
+      return {
+        p2pResult: 0,
+        bcvUsdResult: 0,
+        bcvEurResult: 0,
+        diffUsd: 0,
+        diffEur: 0,
+      };
+    }
 
     if (calcMode === 'USDT_TO_VES') {
       const p2pRate = data?.binanceP2P.sell.average || bcvUsdPrice;
       const p2pResult = numericAmount * p2pRate;
-      const bcvResult = numericAmount * bcvUsdPrice;
+      const bcvUsdResult = numericAmount * bcvUsdPrice;
+      const bcvEurResult = numericAmount * bcvEurPrice;
       return {
         p2pResult,
-        bcvResult,
-        diff: p2pResult - bcvResult,
+        bcvUsdResult,
+        bcvEurResult,
+        diffUsd: p2pResult - bcvUsdResult,
+        diffEur: p2pResult - bcvEurResult,
       };
     } else {
       const p2pRate = data?.binanceP2P.buy.average || bcvUsdPrice;
       const p2pResult = p2pRate > 0 ? numericAmount / p2pRate : 0;
-      const bcvResult = bcvUsdPrice > 0 ? numericAmount / bcvUsdPrice : 0;
+      const bcvUsdResult = bcvUsdPrice > 0 ? numericAmount / bcvUsdPrice : 0;
+      const bcvEurResult = bcvEurPrice > 0 ? numericAmount / bcvEurPrice : 0;
       return {
         p2pResult,
-        bcvResult,
-        diff: bcvResult - p2pResult,
+        bcvUsdResult,
+        bcvEurResult,
+        diffUsd: bcvUsdResult - p2pResult,
+        diffEur: bcvEurResult - p2pResult,
       };
     }
-  }, [numericAmount, calcMode, data, bcvUsdPrice]);
+  }, [numericAmount, calcMode, data, bcvUsdPrice, bcvEurPrice]);
 
   // Copy clean text report for WhatsApp / Telegram
   const handleCopyReport = () => {
@@ -454,39 +468,71 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
           </div>
 
           {/* Result Comparison Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2">
             
             {/* Binance P2P Result */}
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/25 to-gray-900 border border-amber-500/30 shadow-lg">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/30 via-gray-900 to-gray-950 border border-amber-500/30 shadow-lg relative overflow-hidden">
               <div className="flex items-center justify-between text-xs text-amber-300 font-medium">
-                <span>En Binance P2P ({calcMode === 'USDT_TO_VES' ? 'Venta' : 'Compra'})</span>
-                <span className="text-[11px] font-mono">Tasa: {currentP2PAvg.toFixed(2)} Bs.</span>
+                <span className="font-bold flex items-center space-x-1">
+                  <span>🟡</span>
+                  <span>Binance P2P ({calcMode === 'USDT_TO_VES' ? 'Venta' : 'Compra'})</span>
+                </span>
+                <span className="text-[10px] font-mono bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
+                  {currentP2PAvg.toFixed(2)} Bs.
+                </span>
               </div>
-              <div className="text-2xl font-black text-white font-mono my-1.5">
+              <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
                 {calcMode === 'USDT_TO_VES'
                   ? `${calcResults.p2pResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
                   : `${calcResults.p2pResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
                 }
               </div>
-              <div className="text-xs text-gray-400">
-                {calcMode === 'USDT_TO_VES' ? 'Monto total en Bolívares que recibes' : 'Cantidad de USDT que obtienes'}
+              <div className="text-[11px] text-gray-400">
+                {calcMode === 'USDT_TO_VES' ? 'Bolívares que recibes en tu cuenta' : 'Cantidad de USDT que obtienes'}
               </div>
             </div>
 
-            {/* BCV Official Result */}
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-950/25 to-gray-900 border border-blue-500/30 shadow-lg">
+            {/* BCV Dólar Oficial Result */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-950/30 via-gray-900 to-gray-950 border border-blue-500/30 shadow-lg relative overflow-hidden">
               <div className="flex items-center justify-between text-xs text-blue-300 font-medium">
-                <span>Al Dólar Oficial BCV</span>
-                <span className="text-[11px] font-mono">Tasa: {bcvUsdPrice.toFixed(2)} Bs.</span>
+                <span className="font-bold flex items-center space-x-1">
+                  <span>💵</span>
+                  <span>Dólar Oficial BCV</span>
+                </span>
+                <span className="text-[10px] font-mono bg-blue-500/15 px-1.5 py-0.5 rounded border border-blue-500/30">
+                  {bcvUsdPrice.toFixed(2)} Bs.
+                </span>
               </div>
-              <div className="text-2xl font-black text-white font-mono my-1.5">
+              <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
                 {calcMode === 'USDT_TO_VES'
-                  ? `${calcResults.bcvResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
-                  : `${calcResults.bcvResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                  ? `${calcResults.bcvUsdResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
+                  : `${calcResults.bcvUsdResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
                 }
               </div>
-              <div className="text-xs text-cyan-400 font-medium">
-                Diferencia vs BCV: {calcMode === 'USDT_TO_VES' ? `+${calcResults.diff.toLocaleString('es-VE', { maximumFractionDigits: 2 })} Bs.` : `-${calcResults.diff.toFixed(2)} USDT`}
+              <div className="text-[11px] text-cyan-400 font-medium">
+                Diferencia: {calcMode === 'USDT_TO_VES' ? `+${calcResults.diffUsd.toLocaleString('es-VE', { maximumFractionDigits: 2 })} Bs.` : `-${calcResults.diffUsd.toFixed(2)} USD`}
+              </div>
+            </div>
+
+            {/* BCV Euro Oficial Result */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/30 via-gray-900 to-gray-950 border border-indigo-500/30 shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between text-xs text-indigo-300 font-medium">
+                <span className="font-bold flex items-center space-x-1">
+                  <span>💶</span>
+                  <span>Euro Oficial BCV</span>
+                </span>
+                <span className="text-[10px] font-mono bg-indigo-500/15 px-1.5 py-0.5 rounded border border-indigo-500/30">
+                  {bcvEurPrice.toFixed(2)} Bs.
+                </span>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
+                {calcMode === 'USDT_TO_VES'
+                  ? `${calcResults.bcvEurResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
+                  : `${calcResults.bcvEurResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`
+                }
+              </div>
+              <div className="text-[11px] text-indigo-300 font-medium">
+                Diferencia: {calcMode === 'USDT_TO_VES' ? `${calcResults.diffEur >= 0 ? '+' : ''}${calcResults.diffEur.toLocaleString('es-VE', { maximumFractionDigits: 2 })} Bs.` : `${calcResults.diffEur.toFixed(2)} EUR`}
               </div>
             </div>
 
