@@ -4,7 +4,7 @@ import { MarketRatesData, P2POffer, P2PTradeSummary, RateItem } from '@/lib/type
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL'): Promise<P2PTradeSummary> {
+async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL', payTypes: string[] = []): Promise<P2PTradeSummary> {
   try {
     const payload = JSON.stringify({
       fiat: 'VES',
@@ -19,7 +19,7 @@ async function fetchBinanceP2P(tradeType: 'BUY' | 'SELL'): Promise<P2PTradeSumma
       periods: [],
       additionalKycVerifyFilter: 0,
       publisherType: null,
-      payTypes: [],
+      payTypes: payTypes.length > 0 ? payTypes : [],
     });
 
     const res = await fetch('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', {
@@ -124,12 +124,18 @@ async function fetchDolarApiRates(): Promise<{
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const payTypesParam = searchParams.get('payTypes') || searchParams.get('payType') || '';
+    const payTypes = payTypesParam
+      ? payTypesParam.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+
     const [dolarApiData, p2pBuy, p2pSell] = await Promise.all([
       fetchDolarApiRates(),
-      fetchBinanceP2P('BUY'),
-      fetchBinanceP2P('SELL'),
+      fetchBinanceP2P('BUY', payTypes),
+      fetchBinanceP2P('SELL', payTypes),
     ]);
 
     const defaultDate = new Date().toISOString();

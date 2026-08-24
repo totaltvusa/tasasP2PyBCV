@@ -1,13 +1,27 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   RefreshCw, ArrowRightLeft, TrendingUp, DollarSign,
   ShieldCheck, ArrowUpRight, ArrowDownLeft, Calculator,
   Building2, Landmark, Clock, Copy, Check, Sparkles,
-  ExternalLink, Layers, Share2, HelpCircle
+  ExternalLink, Layers, Share2, HelpCircle, Filter,
+  ChevronDown, ChevronUp, CheckSquare, Square, X, SlidersHorizontal
 } from 'lucide-react';
 import { MarketRatesData } from '@/lib/types/rates';
+
+const VENEZUELA_PAYMENT_METHODS = [
+  { id: 'PagoMovil', name: 'Pago Móvil', shortName: 'Pago Móvil', icon: '📱' },
+  { id: 'Banesco', name: 'Banesco', shortName: 'Banesco', icon: '🟢' },
+  { id: 'BancoDeVenezuela', name: 'Banco de Venezuela (BDV)', shortName: 'BDV', icon: '🔴' },
+  { id: 'Mercantil', name: 'Mercantil', shortName: 'Mercantil', icon: '🔵' },
+  { id: 'Provincial', name: 'BBVA Provincial', shortName: 'Provincial', icon: '🔷' },
+  { id: 'BNC', name: 'Banco Nacional de Crédito (BNC)', shortName: 'BNC', icon: '🏛️' },
+  { id: 'Bancaribe', name: 'Bancaribe', shortName: 'Bancaribe', icon: '🏦' },
+  { id: 'BFC', name: 'BFC Fondo Común', shortName: 'BFC', icon: '🏢' },
+  { id: 'Banplus', name: 'Banplus', shortName: 'Banplus', icon: '💳' },
+  { id: 'Zinli', name: 'Zinli', shortName: 'Zinli', icon: '⚡' },
+];
 
 export default function RatesDashboardPage() {
   const [data, setData] = useState<MarketRatesData | null>(null);
@@ -18,15 +32,33 @@ export default function RatesDashboardPage() {
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
+  // Payment methods filter state
+  const [selectedPayTypes, setSelectedPayTypes] = useState<string[]>([]);
+  const [isPayMenuOpen, setIsPayMenuOpen] = useState<boolean>(false);
+  const payMenuRef = useRef<HTMLDivElement>(null);
+
   // Calculator state
   const [calcMode, setCalcMode] = useState<'USDT_TO_VES' | 'VES_TO_USDT'>('USDT_TO_VES');
   const [calcAmount, setCalcAmount] = useState<string>('100');
 
-  const fetchRates = async (showLoading = true) => {
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (payMenuRef.current && !payMenuRef.current.contains(e.target as Node)) {
+        setIsPayMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchRates = async (showLoading = true, payTypesOverride?: string[]) => {
     if (showLoading) setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/v1/rates');
+      const types = payTypesOverride !== undefined ? payTypesOverride : selectedPayTypes;
+      const query = types.length > 0 ? `?payTypes=${encodeURIComponent(types.join(','))}` : '';
+      const res = await fetch(`/api/v1/rates${query}`);
       const json = await res.json();
       if (json.success && json.data) {
         setData(json.data);
@@ -44,7 +76,6 @@ export default function RatesDashboardPage() {
   useEffect(() => {
     fetchRates(true);
 
-    // Optional auto-refresh every 45 seconds
     const interval = setInterval(() => {
       if (autoRefresh) {
         fetchRates(false);
@@ -53,6 +84,20 @@ export default function RatesDashboardPage() {
 
     return () => clearInterval(interval);
   }, [autoRefresh]);
+
+  // Handle toggling individual payment methods
+  const togglePayType = (id: string) => {
+    const next = selectedPayTypes.includes(id)
+      ? selectedPayTypes.filter((t) => t !== id)
+      : [...selectedPayTypes, id];
+    setSelectedPayTypes(next);
+    fetchRates(true, next);
+  };
+
+  const clearPayTypes = () => {
+    setSelectedPayTypes([]);
+    fetchRates(true, []);
+  };
 
   const bcvUsdPrice = data?.bcv.usd.promedio || 0;
   const bcvEurPrice = data?.bcv.eur.promedio || 0;
@@ -105,12 +150,16 @@ export default function RatesDashboardPage() {
   const handleCopyReport = () => {
     if (!data) return;
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const methodsLabel = selectedPayTypes.length > 0
+      ? ` (Filtrado: ${selectedPayTypes.map(id => VENEZUELA_PAYMENT_METHODS.find(m => m.id === id)?.shortName || id).join(', ')})`
+      : '';
+
     const text = `📊 *MONITOR DE TASAS VENEZUELA* 🇻🇪 (${now})
 ━━━━━━━━━━━━━━━━━━━━
 💵 *Dólar BCV Oficial:* ${bcvUsdPrice.toFixed(2)} Bs.
 💶 *Euro BCV Oficial:* ${bcvEurPrice.toFixed(2)} Bs.
 ━━━━━━━━━━━━━━━━━━━━
-🟡 *Binance P2P (USDT/VES):*
+🟡 *Binance P2P (USDT/VES)*${methodsLabel}:
 🟢 *Comprar USDT:* ${data.binanceP2P.buy.average.toFixed(2)} Bs. (Brecha: +${data.spreads.p2pBuyVsBcvPct.toFixed(2)}%)
 🔴 *Vender USDT:* ${data.binanceP2P.sell.average.toFixed(2)} Bs. (Brecha: +${data.spreads.p2pSellVsBcvPct.toFixed(2)}%)
 ━━━━━━━━━━━━━━━━━━━━
@@ -288,7 +337,9 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
 
         {/* ── 2. BLOQUE BINANCE P2P MERCADO EN VIVO (USDT / BOLÍVARES) ── */}
         <section className="space-y-4 pt-2">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          
+          {/* Header Controls: Title + Switcher + Payment Filter */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
               <h2 className="text-sm font-bold uppercase tracking-wider text-amber-300">
@@ -296,38 +347,152 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
               </h2>
             </div>
 
-            {/* BUY / SELL Switcher */}
-            <div className="flex items-center p-1 bg-gray-900 rounded-2xl border border-gray-800 shadow-lg">
-              <button
-                type="button"
-                onClick={() => setActiveTab('BUY')}
-                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
-                  activeTab === 'BUY'
-                    ? 'bg-emerald-500 text-gray-950 shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <ArrowDownLeft className="w-4 h-4" />
-                <span>Comprar USDT</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('SELL')}
-                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
-                  activeTab === 'SELL'
-                    ? 'bg-rose-500 text-white shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <ArrowUpRight className="w-4 h-4" />
-                <span>Vender USDT</span>
-              </button>
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              
+              {/* Payment Methods Dropdown Multi-Select */}
+              <div className="relative" ref={payMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsPayMenuOpen(!isPayMenuOpen)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border shadow-sm ${
+                    selectedPayTypes.length > 0
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-gray-900 border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                  <span>
+                    {selectedPayTypes.length === 0
+                      ? 'Todos los medios de pago'
+                      : `${selectedPayTypes.length} medio${selectedPayTypes.length > 1 ? 's' : ''} seleccionado${selectedPayTypes.length > 1 ? 's' : ''}`
+                    }
+                  </span>
+                  {isPayMenuOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {/* Dropdown Menu */}
+                {isPayMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl glass-card border border-gray-700 bg-gray-900/95 p-3 shadow-2xl space-y-2 z-50 animate-fadeIn max-h-80 overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-800 text-xs">
+                      <span className="font-bold text-white">Filtrar por Banco / Medio</span>
+                      {selectedPayTypes.length > 0 && (
+                        <button
+                          onClick={clearPayTypes}
+                          className="text-[11px] text-rose-400 hover:underline font-semibold"
+                        >
+                          Limpiar filtro
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {VENEZUELA_PAYMENT_METHODS.map((method) => {
+                        const isSelected = selectedPayTypes.includes(method.id);
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => togglePayType(method.id)}
+                            className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition ${
+                              isSelected
+                                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30'
+                                : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
+                            }`}
+                          >
+                            <span className="flex items-center space-x-2 truncate">
+                              <span>{method.icon}</span>
+                              <span className="truncate">{method.name}</span>
+                            </span>
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-amber-400 shrink-0 ml-1.5" />
+                            ) : (
+                              <Square className="w-4 h-4 text-gray-600 shrink-0 ml-1.5" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* BUY / SELL Switcher */}
+              <div className="flex items-center p-1 bg-gray-900 rounded-2xl border border-gray-800 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('BUY')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+                    activeTab === 'BUY'
+                      ? 'bg-emerald-500 text-gray-950 shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <ArrowDownLeft className="w-4 h-4" />
+                  <span>Comprar USDT</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('SELL')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+                    activeTab === 'SELL'
+                      ? 'bg-rose-500 text-white shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>Vender USDT</span>
+                </button>
+              </div>
+
             </div>
+          </div>
+
+          {/* Quick Filter Chips */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 custom-scrollbar">
+            <span className="text-[11px] text-gray-500 font-semibold shrink-0">Filtro rápido:</span>
+            <button
+              onClick={clearPayTypes}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition shrink-0 ${
+                selectedPayTypes.length === 0
+                  ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                  : 'bg-gray-900/80 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              Todos (Sin filtro)
+            </button>
+            {VENEZUELA_PAYMENT_METHODS.slice(0, 6).map((method) => {
+              const isSelected = selectedPayTypes.includes(method.id);
+              return (
+                <button
+                  key={method.id}
+                  onClick={() => togglePayType(method.id)}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition flex items-center space-x-1 shrink-0 ${
+                    isSelected
+                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 font-bold'
+                      : 'bg-gray-900/80 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
+                  <span>{method.icon}</span>
+                  <span>{method.shortName}</span>
+                  {isSelected && <X className="w-3 h-3 ml-0.5 text-amber-400" />}
+                </button>
+              );
+            })}
           </div>
 
           {/* P2P Main Stats Cards */}
           <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/20 via-gray-900 to-gray-950 border border-amber-500/30 shadow-2xl space-y-6">
             
+            {selectedPayTypes.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-300">
+                <span className="flex items-center space-x-1.5">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Filtrando por: <strong>{selectedPayTypes.map(id => VENEZUELA_PAYMENT_METHODS.find(m => m.id === id)?.shortName || id).join(', ')}</strong></span>
+                </span>
+                <button onClick={clearPayTypes} className="text-[11px] underline font-bold">Ver todos</button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Average Price */}
