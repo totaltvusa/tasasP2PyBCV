@@ -64,6 +64,17 @@ export default function RatesDashboardPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyCalcMode, setHistoryCalcMode] = useState<'USD_TO_VES' | 'VES_TO_USD'>('USD_TO_VES');
   const [historyCalcAmount, setHistoryCalcAmount] = useState<string>('100');
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const openCalendarPicker = () => {
+    if (dateInputRef.current) {
+      if (typeof (dateInputRef.current as any).showPicker === 'function') {
+        (dateInputRef.current as any).showPicker();
+      } else {
+        dateInputRef.current.focus();
+      }
+    }
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -1019,23 +1030,50 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
 
               {/* Date Input + Presets */}
               <div className="space-y-3">
-                <div className="flex items-center space-x-3 flex-wrap sm:flex-nowrap gap-2">
-                  <div className="relative flex-1 min-w-[240px]">
+                <div className="flex items-center space-x-2.5 flex-wrap sm:flex-nowrap gap-2">
+                  <div
+                    onClick={openCalendarPicker}
+                    onDoubleClick={openCalendarPicker}
+                    title="Haz clic o doble clic para abrir el calendario"
+                    className="relative flex-1 min-w-[240px] group cursor-pointer"
+                  >
                     <input
+                      ref={dateInputRef}
                       type="date"
                       max={getTodayStr()}
                       min="2023-01-01"
                       value={selectedHistoryDate}
                       onChange={(e) => setSelectedHistoryDate(e.target.value)}
-                      className="w-full bg-gray-950 border border-gray-800 focus:border-blue-500 rounded-2xl px-4 py-3 text-base sm:text-lg font-mono text-white focus:outline-none transition shadow-inner cursor-pointer"
+                      onClick={(e) => {
+                        try {
+                          (e.target as any).showPicker?.();
+                        } catch {}
+                      }}
+                      className="w-full bg-gray-950 border border-gray-800 group-hover:border-blue-500/80 focus:border-blue-500 rounded-2xl pl-12 pr-4 py-3.5 text-base sm:text-lg font-mono text-white focus:outline-none transition shadow-inner cursor-pointer"
                     />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center space-x-1 text-blue-400 pointer-events-none">
+                      <Calendar className="w-5 h-5 group-hover:scale-110 transition" />
+                    </div>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] text-gray-500 pointer-events-none hidden md:inline">
+                      (Doble clic para abrir calendario)
+                    </span>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={openCalendarPicker}
+                    title="Abrir calendario interactivo"
+                    className="p-3.5 rounded-2xl bg-gray-800 hover:bg-gray-700 text-blue-300 hover:text-white border border-gray-700 transition flex items-center space-x-1.5 shrink-0 shadow-sm"
+                  >
+                    <CalendarDays className="w-5 h-5 text-blue-400" />
+                    <span className="text-xs font-bold hidden sm:inline">Calendario</span>
+                  </button>
 
                   <button
                     type="button"
                     onClick={() => fetchHistoricalRates(selectedHistoryDate)}
                     disabled={isHistoryLoading}
-                    className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition flex items-center space-x-2 shrink-0 shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                    className="px-5 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition flex items-center space-x-2 shrink-0 shadow-lg shadow-blue-600/20 disabled:opacity-50"
                   >
                     <RefreshCw className={`w-4 h-4 ${isHistoryLoading ? 'animate-spin' : ''}`} />
                     <span>Consultar Fecha</span>
