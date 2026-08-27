@@ -107,6 +107,18 @@ export default function RatesDashboardPage() {
   const currentBcvEur = data?.bcv.eur.promedio || 0;
   const nextDayBcv = data?.bcv.nextBusinessDay;
 
+  const todayFormattedText = useMemo(() => {
+    if (data?.bcv.usd.fechaActualizacion) {
+      try {
+        const d = new Date(data.bcv.usd.fechaActualizacion);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        }
+      } catch {}
+    }
+    return new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }, [data]);
+
   // Decide effective rate for calculations & spread
   const effectiveBcvUsd = useMemo(() => {
     if (calcBcvSource === 'CURRENT') return currentBcvUsd;
@@ -364,7 +376,7 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* Dólar BCV */}
+            {/* Dólar BCV Hoy */}
             <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-950/40 via-gray-900/90 to-gray-950 border border-blue-500/30 shadow-xl relative overflow-hidden group">
               <div className="absolute -right-8 -top-8 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/20 transition" />
               
@@ -373,48 +385,31 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
                   <span className="text-lg">💵</span>
                   <span className="text-sm font-bold text-white">Dólar BCV (USD)</span>
                 </span>
-                {nextDayBcv?.isAnnounced ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/30 text-blue-200 border border-blue-400/50 tracking-wider">
-                    PRÓXIMO DÍA HÁBIL 🚀
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40 tracking-wider">
-                    OFICIAL
-                  </span>
-                )}
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40 tracking-wider">
+                  OFICIAL HOY
+                </span>
               </div>
 
-              {/* Rate Value Display */}
+              {/* Rate Value Display (Today's rate) */}
               <div className="flex items-baseline space-x-2 my-2">
                 <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                  {(nextDayBcv?.isAnnounced ? nextDayBcv.usd : currentBcvUsd) > 0
-                    ? (nextDayBcv?.isAnnounced ? nextDayBcv.usd : currentBcvUsd).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                  {currentBcvUsd > 0
+                    ? currentBcvUsd.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
                     : '---'}
                 </span>
                 <span className="text-sm font-bold text-gray-400">Bs. / USD</span>
               </div>
 
-              {/* Subtitle / Details */}
+              {/* Subtitle / Details with Today's Date */}
               <div className="text-xs text-gray-400 flex items-center justify-between pt-3 border-t border-blue-500/20 flex-wrap gap-1">
-                {nextDayBcv?.isAnnounced ? (
-                  <>
-                    <span className="text-cyan-300">
-                      📅 Válido: <strong>{nextDayBcv.fechaValorTexto}</strong>
-                    </span>
-                    <span className="text-[11px] text-gray-500 font-mono">
-                      Hoy: {currentBcvUsd.toFixed(2)} Bs. ({nextDayBcv.diffUsd >= 0 ? '+' : ''}{nextDayBcv.diffUsd.toFixed(2)})
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>1 Dólar = {currentBcvUsd.toFixed(2)} VES</span>
-                    <span className="text-[10px] text-gray-500 font-mono">Tasa de cambio BCV</span>
-                  </>
-                )}
+                <span>1 USD = {currentBcvUsd.toFixed(2)} VES</span>
+                <span className="text-[11px] text-blue-300/90 font-mono capitalize">
+                  Válido: {todayFormattedText}
+                </span>
               </div>
             </div>
 
-            {/* Euro BCV */}
+            {/* Euro BCV Hoy */}
             <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-950/40 via-gray-900/90 to-gray-950 border border-indigo-500/30 shadow-xl relative overflow-hidden group">
               <div className="absolute -right-8 -top-8 w-28 h-28 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-indigo-500/20 transition" />
               
@@ -423,44 +418,27 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
                   <span className="text-lg">💶</span>
                   <span className="text-sm font-bold text-white">Euro BCV (EUR)</span>
                 </span>
-                {nextDayBcv?.isAnnounced ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/30 text-indigo-200 border border-indigo-400/50 tracking-wider">
-                    PRÓXIMO DÍA HÁBIL 🚀
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 tracking-wider">
-                    OFICIAL
-                  </span>
-                )}
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 tracking-wider">
+                  OFICIAL HOY
+                </span>
               </div>
 
-              {/* Rate Value Display */}
+              {/* Rate Value Display (Today's rate) */}
               <div className="flex items-baseline space-x-2 my-2">
                 <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                  {(nextDayBcv?.isAnnounced ? nextDayBcv.eur : currentBcvEur) > 0
-                    ? (nextDayBcv?.isAnnounced ? nextDayBcv.eur : currentBcvEur).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                  {currentBcvEur > 0
+                    ? currentBcvEur.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
                     : '---'}
                 </span>
                 <span className="text-sm font-bold text-gray-400">Bs. / EUR</span>
               </div>
 
-              {/* Subtitle / Details */}
+              {/* Subtitle / Details with Today's Date */}
               <div className="text-xs text-gray-400 flex items-center justify-between pt-3 border-t border-indigo-500/20 flex-wrap gap-1">
-                {nextDayBcv?.isAnnounced ? (
-                  <>
-                    <span className="text-indigo-300">
-                      📅 Válido: <strong>{nextDayBcv.fechaValorTexto}</strong>
-                    </span>
-                    <span className="text-[11px] text-gray-500 font-mono">
-                      Hoy: {currentBcvEur.toFixed(2)} Bs. ({nextDayBcv.diffEur >= 0 ? '+' : ''}{nextDayBcv.diffEur.toFixed(2)})
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>1 Euro = {currentBcvEur.toFixed(2)} VES</span>
-                    <span className="text-[10px] text-gray-500 font-mono">Tasa de cambio BCV</span>
-                  </>
-                )}
+                <span>1 EUR = {currentBcvEur.toFixed(2)} VES</span>
+                <span className="text-[11px] text-indigo-300/90 font-mono capitalize">
+                  Válido: {todayFormattedText}
+                </span>
               </div>
             </div>
 
