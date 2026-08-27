@@ -62,3 +62,31 @@ export interface MarketRatesData {
     p2pSpreadPct: number;    // Spread entre Compra y Venta P2P
   };
 }
+
+export interface HistoricalRateEntry {
+  fuente: 'oficial' | 'paralelo';
+  compra?: number | null;
+  venta?: number | null;
+  promedio: number;
+  fecha: string;
+  moneda?: string;
+}
+
+export interface HistoricalRatesData {
+  requestedDate: string;
+  formattedDateText: string;
+  isWeekendOrHoliday?: boolean;
+  bcv: {
+    usd: HistoricalRateEntry;
+    eur: HistoricalRateEntry;
+  };
+  paralelo?: {
+    usd?: HistoricalRateEntry;
+    eur?: HistoricalRateEntry;
+  };
+  spreads: {
+    paraleloUsdVsBcvPct: number;
+    paraleloEurVsBcvPct: number;
+  };
+}
+
