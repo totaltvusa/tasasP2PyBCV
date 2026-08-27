@@ -123,18 +123,25 @@ export async function GET(req: Request) {
       });
     } catch {}
 
+    const isPre2023 = targetDate < '2023-01-03';
+    const isNotFound = usdOficial.promedio === 0;
+
+    const hasParalelo = Boolean(usdParalelo && usdParalelo.promedio > 0);
+
     const responseData: HistoricalRatesData = {
       requestedDate: targetDate,
       formattedDateText,
       isWeekendOrHoliday,
+      isPre2023,
+      isNotFound,
       bcv: {
         usd: usdOficial,
         eur: eurOficial,
       },
-      paralelo: {
-        usd: usdParalelo || undefined,
+      paralelo: hasParalelo && usdParalelo ? {
+        usd: usdParalelo,
         eur: eurParalelo || undefined,
-      },
+      } : undefined,
       spreads: {
         paraleloUsdVsBcvPct,
         paraleloEurVsBcvPct,

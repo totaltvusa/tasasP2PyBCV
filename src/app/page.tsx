@@ -1041,7 +1041,6 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                       ref={dateInputRef}
                       type="date"
                       max={getTodayStr()}
-                      min="2023-01-01"
                       value={selectedHistoryDate}
                       onChange={(e) => setSelectedHistoryDate(e.target.value)}
                       onClick={(e) => {
@@ -1157,7 +1156,7 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                     </div>
                   </div>
 
-                  {historyData.isWeekendOrHoliday && (
+                  {historyData.isWeekendOrHoliday && !historyData.isPre2023 && (
                     <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium">
                       <Info className="w-3.5 h-3.5 shrink-0 text-amber-400" />
                       <span>Fin de semana o feriado (Tasa BCV fijada para la jornada: {historyData.bcv.usd.fecha})</span>
@@ -1165,186 +1164,205 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                   )}
                 </div>
 
+                {/* Pre-2023 Notice Banner */}
+                {historyData.isPre2023 && (
+                  <div className="p-4 sm:p-5 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm space-y-1.5 animate-fadeIn">
+                    <div className="flex items-center space-x-2 font-bold text-amber-200">
+                      <Info className="w-5 h-5 text-amber-400 shrink-0" />
+                      <span>Registro previo a la escala monetaria actual (2023)</span>
+                    </div>
+                    <p className="text-xs text-gray-300">
+                      La base de datos digitalizada con la expresión monetaria actual (Bolívar Digital) está registrada a partir del <strong>3 de enero de 2023</strong>. Para fechas anteriores a 2023, el BCV y los mercados operaban en escalas monetarias previas a la reconversión de 2021 (Bolívar Soberano / Bolívar Fuerte).
+                    </p>
+                  </div>
+                )}
+
                 {/* Historical Rate Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  
-                  {/* 1. Dólar BCV Oficial Histórico */}
-                  <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-950/40 via-gray-900 to-gray-950 border border-blue-500/30 shadow-xl">
-                    <div className="flex items-center justify-between text-xs text-blue-300 font-medium mb-1">
-                      <span className="flex items-center space-x-1.5">
-                        <span>💵</span>
-                        <span className="font-bold text-white">Dólar BCV (Oficial)</span>
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300">
-                        BCV
-                      </span>
+                {!historyData.isPre2023 && (
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 ${historyData.paralelo?.usd?.promedio ? 'md:grid-cols-3' : ''} gap-4`}>
+                    
+                    {/* 1. Dólar BCV Oficial Histórico */}
+                    <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-950/40 via-gray-900 to-gray-950 border border-blue-500/30 shadow-xl">
+                      <div className="flex items-center justify-between text-xs text-blue-300 font-medium mb-1">
+                        <span className="flex items-center space-x-1.5">
+                          <span>💵</span>
+                          <span className="font-bold text-white">Dólar BCV (Oficial)</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300">
+                          BCV
+                        </span>
+                      </div>
+                      <div className="text-2xl sm:text-3xl font-black text-white font-mono my-2">
+                        {historyData.bcv.usd.promedio > 0
+                          ? historyData.bcv.usd.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                          : '---'} <span className="text-xs text-gray-400">Bs.</span>
+                      </div>
+                      <div className="text-[11px] text-gray-400 pt-2 border-t border-blue-500/10">
+                        Fecha fijada: {historyData.bcv.usd.fecha || historyData.requestedDate}
+                      </div>
                     </div>
-                    <div className="text-2xl sm:text-3xl font-black text-white font-mono my-2">
-                      {historyData.bcv.usd.promedio > 0
-                        ? historyData.bcv.usd.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-                        : '---'} <span className="text-xs text-gray-400">Bs.</span>
-                    </div>
-                    <div className="text-[11px] text-gray-400 pt-2 border-t border-blue-500/10">
-                      Fecha fijada: {historyData.bcv.usd.fecha || historyData.requestedDate}
-                    </div>
-                  </div>
 
-                  {/* 2. Euro BCV Oficial Histórico */}
-                  <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-950/40 via-gray-900 to-gray-950 border border-indigo-500/30 shadow-xl">
-                    <div className="flex items-center justify-between text-xs text-indigo-300 font-medium mb-1">
-                      <span className="flex items-center space-x-1.5">
-                        <span>💶</span>
-                        <span className="font-bold text-white">Euro BCV (Oficial)</span>
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">
-                        BCV
-                      </span>
+                    {/* 2. Euro BCV Oficial Histórico */}
+                    <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-950/40 via-gray-900 to-gray-950 border border-indigo-500/30 shadow-xl">
+                      <div className="flex items-center justify-between text-xs text-indigo-300 font-medium mb-1">
+                        <span className="flex items-center space-x-1.5">
+                          <span>💶</span>
+                          <span className="font-bold text-white">Euro BCV (Oficial)</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">
+                          BCV
+                        </span>
+                      </div>
+                      <div className="text-2xl sm:text-3xl font-black text-white font-mono my-2">
+                        {historyData.bcv.eur.promedio > 0
+                          ? historyData.bcv.eur.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                          : '---'} <span className="text-xs text-gray-400">Bs.</span>
+                      </div>
+                      <div className="text-[11px] text-gray-400 pt-2 border-t border-indigo-500/10">
+                        Fecha fijada: {historyData.bcv.eur.fecha || historyData.requestedDate}
+                      </div>
                     </div>
-                    <div className="text-2xl sm:text-3xl font-black text-white font-mono my-2">
-                      {historyData.bcv.eur.promedio > 0
-                        ? historyData.bcv.eur.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-                        : '---'} <span className="text-xs text-gray-400">Bs.</span>
-                    </div>
-                    <div className="text-[11px] text-gray-400 pt-2 border-t border-indigo-500/10">
-                      Fecha fijada: {historyData.bcv.eur.fecha || historyData.requestedDate}
-                    </div>
-                  </div>
 
-                  {/* 3. Dólar Paralelo Histórico */}
-                  <div className="p-5 rounded-3xl bg-gradient-to-br from-amber-950/30 via-gray-900 to-gray-950 border border-amber-500/30 shadow-xl">
-                    <div className="flex items-center justify-between text-xs text-amber-300 font-medium mb-1">
-                      <span className="flex items-center space-x-1.5">
-                        <span>📊</span>
-                        <span className="font-bold text-white">Dólar Paralelo / Libre</span>
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
-                        MERCADO
-                      </span>
-                    </div>
-                    <div className="text-2xl sm:text-3xl font-black text-amber-300 font-mono my-2">
-                      {historyData.paralelo?.usd?.promedio
-                        ? historyData.paralelo.usd.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        : '---'} <span className="text-xs text-gray-400">Bs.</span>
-                    </div>
-                    <div className="text-[11px] text-cyan-400 pt-2 border-t border-amber-500/10 flex items-center justify-between">
-                      <span>Brecha vs BCV:</span>
-                      <span className="font-bold font-mono">+{historyData.spreads.paraleloUsdVsBcvPct.toFixed(2)}%</span>
-                    </div>
-                  </div>
+                    {/* 3. Dólar Paralelo Histórico (Condicional si existe data) */}
+                    {Boolean(historyData.paralelo?.usd?.promedio && historyData.paralelo.usd.promedio > 0) && (
+                      <div className="p-5 rounded-3xl bg-gradient-to-br from-amber-950/30 via-gray-900 to-gray-950 border border-amber-500/30 shadow-xl">
+                        <div className="flex items-center justify-between text-xs text-amber-300 font-medium mb-1">
+                          <span className="flex items-center space-x-1.5">
+                            <span>📊</span>
+                            <span className="font-bold text-white">Dólar Paralelo / Libre</span>
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
+                            MERCADO
+                          </span>
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-black text-amber-300 font-mono my-2">
+                          {historyData.paralelo!.usd!.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs text-gray-400">Bs.</span>
+                        </div>
+                        <div className="text-[11px] text-cyan-400 pt-2 border-t border-amber-500/10 flex items-center justify-between">
+                          <span>Brecha vs BCV:</span>
+                          <span className="font-bold font-mono">+{historyData.spreads.paraleloUsdVsBcvPct.toFixed(2)}%</span>
+                        </div>
+                      </div>
+                    )}
 
-                </div>
+                  </div>
+                )}
 
                 {/* ── CALCULADORA HISTÓRICA ── */}
-                <section className="p-5 sm:p-6 rounded-3xl bg-gray-900/90 border border-gray-800 shadow-2xl space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <Calculator className="w-5 h-5 text-emerald-400" />
-                      <h2 className="text-sm font-bold uppercase tracking-wider text-gray-200">
-                        Calculadora con Tasas de la Fecha ({historyData.requestedDate})
-                      </h2>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setHistoryCalcMode(historyCalcMode === 'USD_TO_VES' ? 'VES_TO_USD' : 'USD_TO_VES')}
-                      className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-200 hover:text-white font-bold flex items-center space-x-2 transition"
-                    >
-                      <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
-                      <span>
-                        {historyCalcMode === 'USD_TO_VES' ? 'Dólares (USD) ➔ Bolívares' : 'Bolívares ➔ Dólares (USD)'}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Input Form */}
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        step="any"
-                        value={historyCalcAmount}
-                        onChange={(e) => setHistoryCalcAmount(e.target.value)}
-                        placeholder="Ingrese monto para calcular en esa fecha..."
-                        className="w-full bg-gray-950 border border-gray-800 focus:border-emerald-500 rounded-2xl px-4 py-3.5 text-base sm:text-lg font-mono text-white placeholder-gray-600 focus:outline-none transition shadow-inner"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                        {historyCalcMode === 'USD_TO_VES' ? 'USD' : 'VES (Bs.)'}
-                      </span>
-                    </div>
-
-                    {/* Quick Presets */}
-                    <div className="flex items-center space-x-2 overflow-x-auto pb-1 custom-scrollbar">
-                      <span className="text-[11px] text-gray-500 font-medium shrink-0">Montos rápidos:</span>
-                      {(historyCalcMode === 'USD_TO_VES' ? ['10', '50', '100', '250', '500', '1000'] : ['1000', '5000', '10000', '25000', '50000']).map((amt) => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setHistoryCalcAmount(amt)}
-                          className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white transition shrink-0"
-                        >
-                          {historyCalcMode === 'USD_TO_VES' ? `$${amt}` : `${parseInt(amt).toLocaleString()} Bs.`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Results Comparison Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2">
-                    
-                    {/* Dólar BCV Oficial */}
-                    <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-500/30">
-                      <div className="flex items-center justify-between text-xs text-blue-300 font-medium">
-                        <span>💵 Dólar Oficial BCV</span>
-                        <span className="text-[10px] font-mono">{histUsdOficialRate.toFixed(2)} Bs.</span>
+                {!historyData.isPre2023 && historyData.bcv.usd.promedio > 0 && (
+                  <section className="p-5 sm:p-6 rounded-3xl bg-gray-900/90 border border-gray-800 shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Calculator className="w-5 h-5 text-emerald-400" />
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-200">
+                          Calculadora con Tasas de la Fecha ({historyData.requestedDate})
+                        </h2>
                       </div>
-                      <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
-                        {historyCalcMode === 'USD_TO_VES'
-                          ? `${historyCalcResults.bcvUsdResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
-                          : `${historyCalcResults.bcvUsdResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-                        }
+
+                      <button
+                        type="button"
+                        onClick={() => setHistoryCalcMode(historyCalcMode === 'USD_TO_VES' ? 'VES_TO_USD' : 'USD_TO_VES')}
+                        className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-200 hover:text-white font-bold flex items-center space-x-2 transition"
+                      >
+                        <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+                        <span>
+                          {historyCalcMode === 'USD_TO_VES' ? 'Dólares (USD) ➔ Bolívares' : 'Bolívares ➔ Dólares (USD)'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Input Form */}
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={historyCalcAmount}
+                          onChange={(e) => setHistoryCalcAmount(e.target.value)}
+                          placeholder="Ingrese monto para calcular en esa fecha..."
+                          className="w-full bg-gray-950 border border-gray-800 focus:border-emerald-500 rounded-2xl px-4 py-3.5 text-base sm:text-lg font-mono text-white placeholder-gray-600 focus:outline-none transition shadow-inner"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                          {historyCalcMode === 'USD_TO_VES' ? 'USD' : 'VES (Bs.)'}
+                        </span>
                       </div>
-                      <div className="text-[11px] text-gray-400">
-                        {historyCalcMode === 'USD_TO_VES' ? 'Monto oficial en Bolívares' : 'Dólares oficiales'}
+
+                      {/* Quick Presets */}
+                      <div className="flex items-center space-x-2 overflow-x-auto pb-1 custom-scrollbar">
+                        <span className="text-[11px] text-gray-500 font-medium shrink-0">Montos rápidos:</span>
+                        {(historyCalcMode === 'USD_TO_VES' ? ['10', '50', '100', '250', '500', '1000'] : ['1000', '5000', '10000', '25000', '50000']).map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setHistoryCalcAmount(amt)}
+                            className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white transition shrink-0"
+                          >
+                            {historyCalcMode === 'USD_TO_VES' ? `$${amt}` : `${parseInt(amt).toLocaleString()} Bs.`}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
-                    {/* Dólar Paralelo / Libre */}
-                    <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30">
-                      <div className="flex items-center justify-between text-xs text-amber-300 font-medium">
-                        <span>📊 Dólar Paralelo</span>
-                        <span className="text-[10px] font-mono">{histUsdParaleloRate.toFixed(2)} Bs.</span>
+                    {/* Results Comparison Grid */}
+                    <div className={`grid grid-cols-1 ${Boolean(historyData.paralelo?.usd?.promedio && historyData.paralelo.usd.promedio > 0) ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-3.5 pt-2`}>
+                      
+                      {/* Dólar BCV Oficial */}
+                      <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-500/30">
+                        <div className="flex items-center justify-between text-xs text-blue-300 font-medium">
+                          <span>💵 Dólar Oficial BCV</span>
+                          <span className="text-[10px] font-mono">{histUsdOficialRate.toFixed(2)} Bs.</span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
+                          {historyCalcMode === 'USD_TO_VES'
+                            ? `${historyCalcResults.bcvUsdResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
+                            : `${historyCalcResults.bcvUsdResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                          }
+                        </div>
+                        <div className="text-[11px] text-gray-400">
+                          {historyCalcMode === 'USD_TO_VES' ? 'Monto oficial en Bolívares' : 'Dólares oficiales'}
+                        </div>
                       </div>
-                      <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
-                        {historyCalcMode === 'USD_TO_VES'
-                          ? `${historyCalcResults.paraleloUsdResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
-                          : `${historyCalcResults.paraleloUsdResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-                        }
-                      </div>
-                      <div className="text-[11px] text-cyan-400">
-                        Diferencia: {historyCalcMode === 'USD_TO_VES' ? `+${historyCalcResults.diffParaleloVsBcv.toLocaleString('es-VE', { maximumFractionDigits: 2 })} Bs.` : `-${historyCalcResults.diffParaleloVsBcv.toFixed(2)} USD`}
-                      </div>
-                    </div>
 
-                    {/* Euro BCV Oficial */}
-                    <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30">
-                      <div className="flex items-center justify-between text-xs text-indigo-300 font-medium">
-                        <span>💶 Euro Oficial BCV</span>
-                        <span className="text-[10px] font-mono">{histEurOficialRate.toFixed(2)} Bs.</span>
+                      {/* Euro BCV Oficial */}
+                      <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30">
+                        <div className="flex items-center justify-between text-xs text-indigo-300 font-medium">
+                          <span>💶 Euro Oficial BCV</span>
+                          <span className="text-[10px] font-mono">{histEurOficialRate.toFixed(2)} Bs.</span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
+                          {historyCalcMode === 'USD_TO_VES'
+                            ? `${historyCalcResults.bcvEurResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
+                            : `${historyCalcResults.bcvEurResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`
+                          }
+                        </div>
+                        <div className="text-[11px] text-gray-400">
+                          {historyCalcMode === 'USD_TO_VES' ? 'Monto oficial en Bolívares' : 'Euros oficiales'}
+                        </div>
                       </div>
-                      <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
-                        {historyCalcMode === 'USD_TO_VES'
-                          ? `${historyCalcResults.bcvEurResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
-                          : `${historyCalcResults.bcvEurResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`
-                        }
-                      </div>
-                      <div className="text-[11px] text-gray-400">
-                        {historyCalcMode === 'USD_TO_VES' ? 'Monto oficial en Bolívares' : 'Euros oficiales'}
-                      </div>
-                    </div>
 
-                  </div>
-                </section>
+                      {/* Dólar Paralelo (Condicional si existe data) */}
+                      {Boolean(historyData.paralelo?.usd?.promedio && historyData.paralelo.usd.promedio > 0) && (
+                        <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30">
+                          <div className="flex items-center justify-between text-xs text-amber-300 font-medium">
+                            <span>📊 Dólar Paralelo</span>
+                            <span className="text-[10px] font-mono">{histUsdParaleloRate.toFixed(2)} Bs.</span>
+                          </div>
+                          <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
+                            {historyCalcMode === 'USD_TO_VES'
+                              ? `${historyCalcResults.paraleloUsdResult.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.`
+                              : `${historyCalcResults.paraleloUsdResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                            }
+                          </div>
+                          <div className="text-[11px] text-cyan-400">
+                            Diferencia: {historyCalcMode === 'USD_TO_VES' ? `+${historyCalcResults.diffParaleloVsBcv.toLocaleString('es-VE', { maximumFractionDigits: 2 })} Bs.` : `-${historyCalcResults.diffParaleloVsBcv.toFixed(2)} USD`}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  </section>
+                )}
 
               </div>
             )}

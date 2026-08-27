@@ -76,6 +76,8 @@ export interface HistoricalRatesData {
   requestedDate: string;
   formattedDateText: string;
   isWeekendOrHoliday?: boolean;
+  isPre2023?: boolean;
+  isNotFound?: boolean;
   bcv: {
     usd: HistoricalRateEntry;
     eur: HistoricalRateEntry;
