@@ -1040,6 +1040,7 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                     <input
                       ref={dateInputRef}
                       type="date"
+                      min="2023-01-03"
                       max={getTodayStr()}
                       value={selectedHistoryDate}
                       onChange={(e) => setSelectedHistoryDate(e.target.value)}
@@ -1156,7 +1157,7 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                     </div>
                   </div>
 
-                  {historyData.isWeekendOrHoliday && !historyData.isPre2023 && (
+                  {historyData.isWeekendOrHoliday && (
                     <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium">
                       <Info className="w-3.5 h-3.5 shrink-0 text-amber-400" />
                       <span>Fin de semana o feriado (Tasa BCV fijada para la jornada: {historyData.bcv.usd.fecha})</span>
@@ -1164,22 +1165,8 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                   )}
                 </div>
 
-                {/* Pre-2023 Notice Banner */}
-                {historyData.isPre2023 && (
-                  <div className="p-4 sm:p-5 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm space-y-1.5 animate-fadeIn">
-                    <div className="flex items-center space-x-2 font-bold text-amber-200">
-                      <Info className="w-5 h-5 text-amber-400 shrink-0" />
-                      <span>Registro previo a la escala monetaria actual (2023)</span>
-                    </div>
-                    <p className="text-xs text-gray-300">
-                      La base de datos digitalizada con la expresión monetaria actual (Bolívar Digital) está registrada a partir del <strong>3 de enero de 2023</strong>. Para fechas anteriores a 2023, el BCV y los mercados operaban en escalas monetarias previas a la reconversión de 2021 (Bolívar Soberano / Bolívar Fuerte).
-                    </p>
-                  </div>
-                )}
-
                 {/* Historical Rate Cards Grid */}
-                {!historyData.isPre2023 && (
-                  <div className={`grid grid-cols-1 sm:grid-cols-2 ${historyData.paralelo?.usd?.promedio ? 'md:grid-cols-3' : ''} gap-4`}>
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${historyData.paralelo?.usd?.promedio ? 'md:grid-cols-3' : ''} gap-4`}>
                     
                     {/* 1. Dólar BCV Oficial Histórico */}
                     <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-950/40 via-gray-900 to-gray-950 border border-blue-500/30 shadow-xl">
@@ -1246,10 +1233,9 @@ Consulte histórico en: https://${typeof window !== 'undefined' ? window.locatio
                     )}
 
                   </div>
-                )}
 
                 {/* ── CALCULADORA HISTÓRICA ── */}
-                {!historyData.isPre2023 && historyData.bcv.usd.promedio > 0 && (
+                {historyData.bcv.usd.promedio > 0 && (
                   <section className="p-5 sm:p-6 rounded-3xl bg-gray-900/90 border border-gray-800 shadow-2xl space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-2">
