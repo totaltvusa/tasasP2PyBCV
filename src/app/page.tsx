@@ -6,7 +6,8 @@ import {
   ShieldCheck, ArrowUpRight, ArrowDownLeft, Calculator,
   Building2, Landmark, Clock, Copy, Check, Sparkles,
   ExternalLink, Layers, Share2, HelpCircle, Filter,
-  ChevronDown, ChevronUp, CheckSquare, Square, X, SlidersHorizontal, AlertTriangle
+  ChevronDown, ChevronUp, CheckSquare, Square, X, SlidersHorizontal, AlertTriangle,
+  CalendarDays, Zap
 } from 'lucide-react';
 import { MarketRatesData } from '@/lib/types/rates';
 
@@ -42,6 +43,7 @@ export default function RatesDashboardPage() {
   // Calculator state
   const [calcMode, setCalcMode] = useState<'USDT_TO_VES' | 'VES_TO_USDT'>('USDT_TO_VES');
   const [calcAmount, setCalcAmount] = useState<string>('100');
+  const [calcBcvSource, setCalcBcvSource] = useState<'AUTO' | 'NEXT_DAY' | 'CURRENT'>('AUTO');
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -87,7 +89,6 @@ export default function RatesDashboardPage() {
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  // Handle toggling individual payment methods
   const togglePayType = (id: string) => {
     const next = selectedPayTypes.includes(id)
       ? selectedPayTypes.filter((t) => t !== id)
@@ -101,8 +102,23 @@ export default function RatesDashboardPage() {
     fetchRates(true, []);
   };
 
-  const bcvUsdPrice = data?.bcv.usd.promedio || 0;
-  const bcvEurPrice = data?.bcv.eur.promedio || 0;
+  // Base BCV rates
+  const currentBcvUsd = data?.bcv.usd.promedio || 0;
+  const currentBcvEur = data?.bcv.eur.promedio || 0;
+  const nextDayBcv = data?.bcv.nextBusinessDay;
+
+  // Decide effective rate for calculations & spread
+  const effectiveBcvUsd = useMemo(() => {
+    if (calcBcvSource === 'CURRENT') return currentBcvUsd;
+    if (calcBcvSource === 'NEXT_DAY' && nextDayBcv?.usd) return nextDayBcv.usd;
+    return (nextDayBcv?.isAnnounced && nextDayBcv.usd > 0) ? nextDayBcv.usd : currentBcvUsd;
+  }, [calcBcvSource, currentBcvUsd, nextDayBcv]);
+
+  const effectiveBcvEur = useMemo(() => {
+    if (calcBcvSource === 'CURRENT') return currentBcvEur;
+    if (calcBcvSource === 'NEXT_DAY' && nextDayBcv?.eur) return nextDayBcv.eur;
+    return (nextDayBcv?.isAnnounced && nextDayBcv.eur > 0) ? nextDayBcv.eur : currentBcvEur;
+  }, [calcBcvSource, currentBcvEur, nextDayBcv]);
 
   const currentP2PSummary = activeTab === 'BUY' ? data?.binanceP2P.buy : data?.binanceP2P.sell;
   const currentP2PAvg = currentP2PSummary?.average || 0;
@@ -122,10 +138,10 @@ export default function RatesDashboardPage() {
     }
 
     if (calcMode === 'USDT_TO_VES') {
-      const p2pRate = data?.binanceP2P.sell.average || bcvUsdPrice;
+      const p2pRate = data?.binanceP2P.sell.average || effectiveBcvUsd;
       const p2pResult = numericAmount * p2pRate;
-      const bcvUsdResult = numericAmount * bcvUsdPrice;
-      const bcvEurResult = numericAmount * bcvEurPrice;
+      const bcvUsdResult = numericAmount * effectiveBcvUsd;
+      const bcvEurResult = numericAmount * effectiveBcvEur;
       return {
         p2pResult,
         bcvUsdResult,
@@ -134,10 +150,10 @@ export default function RatesDashboardPage() {
         diffEur: p2pResult - bcvEurResult,
       };
     } else {
-      const p2pRate = data?.binanceP2P.buy.average || bcvUsdPrice;
+      const p2pRate = data?.binanceP2P.buy.average || effectiveBcvUsd;
       const p2pResult = p2pRate > 0 ? numericAmount / p2pRate : 0;
-      const bcvUsdResult = bcvUsdPrice > 0 ? numericAmount / bcvUsdPrice : 0;
-      const bcvEurResult = bcvEurPrice > 0 ? numericAmount / bcvEurPrice : 0;
+      const bcvUsdResult = effectiveBcvUsd > 0 ? numericAmount / effectiveBcvUsd : 0;
+      const bcvEurResult = effectiveBcvEur > 0 ? numericAmount / effectiveBcvEur : 0;
       return {
         p2pResult,
         bcvUsdResult,
@@ -146,7 +162,13 @@ export default function RatesDashboardPage() {
         diffEur: bcvEurResult - p2pResult,
       };
     }
-  }, [numericAmount, calcMode, data, bcvUsdPrice, bcvEurPrice]);
+  }, [numericAmount, calcMode, data, effectiveBcvUsd, effectiveBcvEur]);
+
+  // Dynamic spread vs effective BCV rate
+  const dynamicSpreadPct = useMemo(() => {
+    if (effectiveBcvUsd <= 0 || currentP2PAvg <= 0) return 0;
+    return ((currentP2PAvg - effectiveBcvUsd) / effectiveBcvUsd) * 100;
+  }, [effectiveBcvUsd, currentP2PAvg]);
 
   // Copy clean text report for WhatsApp / Telegram
   const handleCopyReport = () => {
@@ -156,14 +178,22 @@ export default function RatesDashboardPage() {
       ? ` (Filtrado: ${selectedPayTypes.map(id => VENEZUELA_PAYMENT_METHODS.find(m => m.id === id)?.shortName || id).join(', ')})`
       : '';
 
+    let nextDaySection = '';
+    if (nextDayBcv?.isAnnounced) {
+      nextDaySection = `🚀 *ANUNCIADO BCV (${nextDayBcv.fechaValorTexto}):*
+💵 *Dólar Próx. Día:* ${nextDayBcv.usd.toFixed(2)} Bs. (${nextDayBcv.diffUsd >= 0 ? '+' : ''}${nextDayBcv.diffUsd.toFixed(2)} Bs.)
+💶 *Euro Próx. Día:* ${nextDayBcv.eur.toFixed(2)} Bs. (${nextDayBcv.diffEur >= 0 ? '+' : ''}${nextDayBcv.diffEur.toFixed(2)} Bs.)
+━━━━━━━━━━━━━━━━━━━━\n`;
+    }
+
     const text = `📊 *MONITOR DE TASAS VENEZUELA* 🇻🇪 (${now})
 ━━━━━━━━━━━━━━━━━━━━
-💵 *Dólar BCV Oficial:* ${bcvUsdPrice.toFixed(2)} Bs.
-💶 *Euro BCV Oficial:* ${bcvEurPrice.toFixed(2)} Bs.
+💵 *Dólar BCV Hoy:* ${currentBcvUsd.toFixed(2)} Bs.
+💶 *Euro BCV Hoy:* ${currentBcvEur.toFixed(2)} Bs.
 ━━━━━━━━━━━━━━━━━━━━
-🟡 *Binance P2P (USDT/VES)*${methodsLabel}:
-🟢 *Comprar USDT:* ${data.binanceP2P.buy.average.toFixed(2)} Bs. (Brecha: +${data.spreads.p2pBuyVsBcvPct.toFixed(2)}%)
-🔴 *Vender USDT:* ${data.binanceP2P.sell.average.toFixed(2)} Bs. (Brecha: +${data.spreads.p2pSellVsBcvPct.toFixed(2)}%)
+${nextDaySection}🟡 *Binance P2P (USDT/VES)*${methodsLabel}:
+🟢 *Comprar USDT:* ${data.binanceP2P.buy.average.toFixed(2)} Bs. (Brecha: +${dynamicSpreadPct.toFixed(2)}%)
+🔴 *Vender USDT:* ${data.binanceP2P.sell.average.toFixed(2)} Bs.
 ━━━━━━━━━━━━━━━━━━━━
 Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.host : 'tasasp2p.vercel.app'}`;
 
@@ -263,6 +293,60 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
           </div>
         )}
 
+        {/* ── ALERTA DESTACADA: NUEVA TASA ANUNCIADA POR EL BCV PARA EL PRÓXIMO DÍA HÁBIL ── */}
+        {nextDayBcv && nextDayBcv.isAnnounced && (
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-950/60 via-indigo-950/50 to-purple-950/60 border border-blue-400/40 shadow-2xl flex items-center justify-between flex-wrap gap-4 animate-fadeIn relative overflow-hidden">
+            <div className="absolute -right-10 -top-10 w-36 h-36 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex items-center space-x-3.5 min-w-[280px]">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-500/30 to-indigo-500/20 border border-blue-400/40 flex items-center justify-center text-yellow-400 shadow-lg shrink-0">
+                <Sparkles className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2 flex-wrap gap-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-blue-300">
+                    Nueva Tasa Oficial Anunciada por el BCV
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/30 text-blue-200 border border-blue-400/50 tracking-wider">
+                    PRÓXIMO DÍA HÁBIL 🚀
+                  </span>
+                </div>
+                <p className="text-xs text-gray-300 mt-0.5">
+                  Válida a partir de: <strong className="text-white font-bold">{nextDayBcv.fechaValorTexto || 'Próxima jornada'}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 shrink-0 font-mono text-xs flex-wrap gap-2">
+              <div className="bg-gray-900/90 px-3.5 py-2 rounded-2xl border border-blue-500/40 shadow-inner">
+                <div className="text-[10px] text-blue-300 font-sans font-medium flex items-center space-x-1">
+                  <span>💵 Dólar Próx. Día</span>
+                </div>
+                <div className="flex items-baseline space-x-1.5 mt-0.5">
+                  <strong className="text-white text-base sm:text-lg font-black">{nextDayBcv.usd.toFixed(2)}</strong>
+                  <span className="text-[10px] text-gray-400">Bs.</span>
+                  <span className={`text-[10px] font-bold ${nextDayBcv.diffUsd >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    ({nextDayBcv.diffUsd >= 0 ? '+' : ''}{nextDayBcv.diffUsd.toFixed(2)} Bs.)
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-gray-900/90 px-3.5 py-2 rounded-2xl border border-indigo-500/40 shadow-inner">
+                <div className="text-[10px] text-indigo-300 font-sans font-medium flex items-center space-x-1">
+                  <span>💶 Euro Próx. Día</span>
+                </div>
+                <div className="flex items-baseline space-x-1.5 mt-0.5">
+                  <strong className="text-white text-base sm:text-lg font-black">{nextDayBcv.eur.toFixed(2)}</strong>
+                  <span className="text-[10px] text-gray-400">Bs.</span>
+                  <span className={`text-[10px] font-bold ${nextDayBcv.diffEur >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    ({nextDayBcv.diffEur >= 0 ? '+' : ''}{nextDayBcv.diffEur.toFixed(2)} Bs.)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── 1. BLOQUE BANCO CENTRAL DE VENEZUELA (BCV OFICIAL) ── */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
@@ -289,21 +373,44 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
                   <span className="text-lg">💵</span>
                   <span className="text-sm font-bold text-white">Dólar BCV (USD)</span>
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40 tracking-wider">
-                  OFICIAL
-                </span>
+                {nextDayBcv?.isAnnounced ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/30 text-blue-200 border border-blue-400/50 tracking-wider">
+                    PRÓXIMO DÍA HÁBIL 🚀
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40 tracking-wider">
+                    OFICIAL
+                  </span>
+                )}
               </div>
 
+              {/* Rate Value Display */}
               <div className="flex items-baseline space-x-2 my-2">
                 <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                  {bcvUsdPrice > 0 ? bcvUsdPrice.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '---'}
+                  {(nextDayBcv?.isAnnounced ? nextDayBcv.usd : currentBcvUsd) > 0
+                    ? (nextDayBcv?.isAnnounced ? nextDayBcv.usd : currentBcvUsd).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                    : '---'}
                 </span>
                 <span className="text-sm font-bold text-gray-400">Bs. / USD</span>
               </div>
 
-              <div className="text-xs text-gray-400 flex items-center justify-between pt-3 border-t border-blue-500/20">
-                <span>1 Dólar Estadounidense = {bcvUsdPrice.toFixed(2)} VES</span>
-                <span className="text-[10px] text-gray-500 font-mono">Tasa de cambio BCV</span>
+              {/* Subtitle / Details */}
+              <div className="text-xs text-gray-400 flex items-center justify-between pt-3 border-t border-blue-500/20 flex-wrap gap-1">
+                {nextDayBcv?.isAnnounced ? (
+                  <>
+                    <span className="text-cyan-300">
+                      📅 Válido: <strong>{nextDayBcv.fechaValorTexto}</strong>
+                    </span>
+                    <span className="text-[11px] text-gray-500 font-mono">
+                      Hoy: {currentBcvUsd.toFixed(2)} Bs. ({nextDayBcv.diffUsd >= 0 ? '+' : ''}{nextDayBcv.diffUsd.toFixed(2)})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>1 Dólar = {currentBcvUsd.toFixed(2)} VES</span>
+                    <span className="text-[10px] text-gray-500 font-mono">Tasa de cambio BCV</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -316,21 +423,44 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
                   <span className="text-lg">💶</span>
                   <span className="text-sm font-bold text-white">Euro BCV (EUR)</span>
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 tracking-wider">
-                  OFICIAL
-                </span>
+                {nextDayBcv?.isAnnounced ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/30 text-indigo-200 border border-indigo-400/50 tracking-wider">
+                    PRÓXIMO DÍA HÁBIL 🚀
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 tracking-wider">
+                    OFICIAL
+                  </span>
+                )}
               </div>
 
+              {/* Rate Value Display */}
               <div className="flex items-baseline space-x-2 my-2">
                 <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                  {bcvEurPrice > 0 ? bcvEurPrice.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '---'}
+                  {(nextDayBcv?.isAnnounced ? nextDayBcv.eur : currentBcvEur) > 0
+                    ? (nextDayBcv?.isAnnounced ? nextDayBcv.eur : currentBcvEur).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                    : '---'}
                 </span>
                 <span className="text-sm font-bold text-gray-400">Bs. / EUR</span>
               </div>
 
-              <div className="text-xs text-gray-400 flex items-center justify-between pt-3 border-t border-indigo-500/20">
-                <span>1 Euro = {bcvEurPrice.toFixed(2)} VES</span>
-                <span className="text-[10px] text-gray-500 font-mono">Tasa de cambio BCV</span>
+              {/* Subtitle / Details */}
+              <div className="text-xs text-gray-400 flex items-center justify-between pt-3 border-t border-indigo-500/20 flex-wrap gap-1">
+                {nextDayBcv?.isAnnounced ? (
+                  <>
+                    <span className="text-indigo-300">
+                      📅 Válido: <strong>{nextDayBcv.fechaValorTexto}</strong>
+                    </span>
+                    <span className="text-[11px] text-gray-500 font-mono">
+                      Hoy: {currentBcvEur.toFixed(2)} Bs. ({nextDayBcv.diffEur >= 0 ? '+' : ''}{nextDayBcv.diffEur.toFixed(2)})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>1 Euro = {currentBcvEur.toFixed(2)} VES</span>
+                    <span className="text-[10px] text-gray-500 font-mono">Tasa de cambio BCV</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -340,7 +470,7 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
         {/* ── 2. BLOQUE BINANCE P2P MERCADO EN VIVO (USDT / BOLÍVARES) ── */}
         <section className="space-y-4 pt-2">
           
-          {/* Header Controls: Title + Switcher + Payment Filter */}
+          {/* Header Controls: Title + Switcher */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
@@ -349,109 +479,106 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
               </h2>
             </div>
 
-            <div className="flex items-center space-x-2 flex-wrap gap-2">
-              
-              {/* Payment Methods Dropdown Multi-Select */}
-              <div className="relative" ref={payMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsPayMenuOpen(!isPayMenuOpen)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border shadow-sm ${
-                    selectedPayTypes.length > 0
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                      : 'bg-gray-900 border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800'
-                  }`}
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-                  <span>
-                    {selectedPayTypes.length === 0
-                      ? 'Todos los medios de pago'
-                      : `${selectedPayTypes.length} medio${selectedPayTypes.length > 1 ? 's' : ''} seleccionado${selectedPayTypes.length > 1 ? 's' : ''}`
-                    }
-                  </span>
-                  {isPayMenuOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
-
-                {/* Dropdown Menu */}
-                {isPayMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl glass-card border border-gray-700 bg-gray-900/95 p-3 shadow-2xl space-y-2 z-50 animate-fadeIn max-h-80 overflow-y-auto custom-scrollbar">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-800 text-xs">
-                      <span className="font-bold text-white">Filtrar por Banco / Medio</span>
-                      {selectedPayTypes.length > 0 && (
-                        <button
-                          onClick={clearPayTypes}
-                          className="text-[11px] text-rose-400 hover:underline font-semibold"
-                        >
-                          Limpiar filtro
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      {VENEZUELA_PAYMENT_METHODS.map((method) => {
-                        const isSelected = selectedPayTypes.includes(method.id);
-                        return (
-                          <button
-                            key={method.id}
-                            type="button"
-                            onClick={() => togglePayType(method.id)}
-                            className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition ${
-                              isSelected
-                                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30'
-                                : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
-                            }`}
-                          >
-                            <span className="flex items-center space-x-2 truncate">
-                              <span>{method.icon}</span>
-                              <span className="truncate">{method.name}</span>
-                            </span>
-                            {isSelected ? (
-                              <CheckSquare className="w-4 h-4 text-amber-400 shrink-0 ml-1.5" />
-                            ) : (
-                              <Square className="w-4 h-4 text-gray-600 shrink-0 ml-1.5" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* BUY / SELL Switcher */}
-              <div className="flex items-center p-1 bg-gray-900 rounded-2xl border border-gray-800 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('BUY')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
-                    activeTab === 'BUY'
-                      ? 'bg-emerald-500 text-gray-950 shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowDownLeft className="w-4 h-4" />
-                  <span>Comprar USDT</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('SELL')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
-                    activeTab === 'SELL'
-                      ? 'bg-rose-500 text-white shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpRight className="w-4 h-4" />
-                  <span>Vender USDT</span>
-                </button>
-              </div>
-
+            {/* BUY / SELL Switcher */}
+            <div className="flex items-center p-1 bg-gray-900 rounded-2xl border border-gray-800 shadow-lg">
+              <button
+                type="button"
+                onClick={() => setActiveTab('BUY')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+                  activeTab === 'BUY'
+                    ? 'bg-emerald-500 text-gray-950 shadow-md font-extrabold'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <ArrowDownLeft className="w-4 h-4" />
+                <span>Comprar USDT</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('SELL')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+                  activeTab === 'SELL'
+                    ? 'bg-rose-500 text-white shadow-md font-extrabold'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <ArrowUpRight className="w-4 h-4" />
+                <span>Vender USDT</span>
+              </button>
             </div>
           </div>
 
-          {/* Quick Filter Chips */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 custom-scrollbar">
-            <span className="text-[11px] text-gray-500 font-semibold shrink-0">Filtro rápido:</span>
+          {/* Payment Methods Selector Bar */}
+          <div className="flex items-center space-x-2 overflow-x-auto pb-1 custom-scrollbar">
+            
+            {/* Payment Methods Dropdown Multi-Select */}
+            <div className="relative shrink-0" ref={payMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsPayMenuOpen(!isPayMenuOpen)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border shadow-sm ${
+                  selectedPayTypes.length > 0
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-gray-900 border-gray-800 text-gray-300 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {selectedPayTypes.length === 0
+                    ? 'Medios de Pago'
+                    : `${selectedPayTypes.length} selec.`
+                  }
+                </span>
+                {isPayMenuOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* Dropdown Menu */}
+              {isPayMenuOpen && (
+                <div className="absolute left-0 top-full mt-2 w-72 rounded-2xl glass-card border border-gray-700 bg-gray-950 p-3 shadow-2xl space-y-2 z-50 animate-fadeIn max-h-80 overflow-y-auto custom-scrollbar">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-800 text-xs">
+                    <span className="font-bold text-white">Filtrar por Banco / Medio</span>
+                    {selectedPayTypes.length > 0 && (
+                      <button
+                        onClick={clearPayTypes}
+                        className="text-[11px] text-rose-400 hover:underline font-semibold"
+                      >
+                        Limpiar filtro
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    {VENEZUELA_PAYMENT_METHODS.map((method) => {
+                      const isSelected = selectedPayTypes.includes(method.id);
+                      return (
+                        <button
+                          key={method.id}
+                          type="button"
+                          onClick={() => togglePayType(method.id)}
+                          className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition ${
+                            isSelected
+                              ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30'
+                              : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center space-x-2 truncate">
+                            <span>{method.icon}</span>
+                            <span className="truncate">{method.name}</span>
+                          </span>
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-amber-400 shrink-0 ml-1.5" />
+                          ) : (
+                            <Square className="w-4 h-4 text-gray-600 shrink-0 ml-1.5" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Filter Chips */}
             <button
               onClick={clearPayTypes}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition shrink-0 ${
@@ -462,7 +589,7 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
             >
               Todos (Sin filtro)
             </button>
-            {VENEZUELA_PAYMENT_METHODS.slice(0, 6).map((method) => {
+            {VENEZUELA_PAYMENT_METHODS.slice(0, 7).map((method) => {
               const isSelected = selectedPayTypes.includes(method.id);
               return (
                 <button
@@ -485,6 +612,7 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
           {/* P2P Main Stats Cards */}
           <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/20 via-gray-900 to-gray-950 border border-amber-500/30 shadow-2xl space-y-6">
             
+            {/* Filter / Fallback Banner */}
             {selectedPayTypes.length > 0 && (
               currentP2PSummary?.isFallback ? (
                 <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 gap-2 flex-wrap sm:flex-nowrap">
@@ -536,15 +664,22 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
 
               {/* Spread / Brecha vs BCV */}
               <div className="p-4 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-md">
-                <div className="text-xs text-gray-400 font-medium">Brecha vs Dólar BCV</div>
+                <div className="text-xs text-gray-400 font-medium flex items-center justify-between">
+                  <span>Brecha vs Dólar BCV</span>
+                  {nextDayBcv?.isAnnounced && (
+                    <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-mono">
+                      vs Próx. Día
+                    </span>
+                  )}
+                </div>
                 <div className="text-2xl sm:text-3xl font-black text-cyan-400 font-mono my-1 flex items-center space-x-1.5">
                   <span>
-                    {data ? (activeTab === 'BUY' ? data.spreads.p2pBuyVsBcvPct : data.spreads.p2pSellVsBcvPct).toFixed(2) : 0}%
+                    {dynamicSpreadPct.toFixed(2)}%
                   </span>
                   <TrendingUp className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div className="text-[11px] text-gray-400 font-medium">
-                  +{(currentP2PAvg - bcvUsdPrice).toFixed(2)} Bs. por dólar vs tasa oficial
+                  +{(currentP2PAvg - effectiveBcvUsd).toFixed(2)} Bs. por dólar vs tasa oficial
                 </div>
               </div>
 
@@ -600,17 +735,47 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
               </h2>
             </div>
 
-            {/* Mode Switcher */}
-            <button
-              type="button"
-              onClick={() => setCalcMode(calcMode === 'USDT_TO_VES' ? 'VES_TO_USDT' : 'USDT_TO_VES')}
-              className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-200 hover:text-white font-bold flex items-center space-x-2 transition"
-            >
-              <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
-              <span>
-                {calcMode === 'USDT_TO_VES' ? 'USDT ➔ Bolívares (VES)' : 'Bolívares (VES) ➔ USDT'}
-              </span>
-            </button>
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              {/* If Next Day rate is announced, offer toggle */}
+              {nextDayBcv?.isAnnounced && (
+                <div className="flex items-center p-0.5 bg-gray-950 rounded-xl border border-gray-800 text-[10px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setCalcBcvSource('NEXT_DAY')}
+                    className={`px-2 py-1 rounded-lg transition ${
+                      calcBcvSource === 'NEXT_DAY' || calcBcvSource === 'AUTO'
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Tasa Próx. Día ({nextDayBcv.usd.toFixed(2)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalcBcvSource('CURRENT')}
+                    className={`px-2 py-1 rounded-lg transition ${
+                      calcBcvSource === 'CURRENT'
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Tasa Hoy ({currentBcvUsd.toFixed(2)})
+                  </button>
+                </div>
+              )}
+
+              {/* Mode Switcher */}
+              <button
+                type="button"
+                onClick={() => setCalcMode(calcMode === 'USDT_TO_VES' ? 'VES_TO_USDT' : 'USDT_TO_VES')}
+                className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs text-gray-200 hover:text-white font-bold flex items-center space-x-2 transition"
+              >
+                <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {calcMode === 'USDT_TO_VES' ? 'USDT ➔ Bolívares (VES)' : 'Bolívares (VES) ➔ USDT'}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Input Form & Quick Presets */}
@@ -676,10 +841,10 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
               <div className="flex items-center justify-between text-xs text-blue-300 font-medium">
                 <span className="font-bold flex items-center space-x-1">
                   <span>💵</span>
-                  <span>Dólar Oficial BCV</span>
+                  <span>Dólar BCV {nextDayBcv?.isAnnounced ? '(Próx. Día)' : ''}</span>
                 </span>
                 <span className="text-[10px] font-mono bg-blue-500/15 px-1.5 py-0.5 rounded border border-blue-500/30">
-                  {bcvUsdPrice.toFixed(2)} Bs.
+                  {effectiveBcvUsd.toFixed(2)} Bs.
                 </span>
               </div>
               <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">
@@ -698,10 +863,10 @@ Consulte en vivo en: https://${typeof window !== 'undefined' ? window.location.h
               <div className="flex items-center justify-between text-xs text-indigo-300 font-medium">
                 <span className="font-bold flex items-center space-x-1">
                   <span>💶</span>
-                  <span>Euro Oficial BCV</span>
+                  <span>Euro BCV {nextDayBcv?.isAnnounced ? '(Próx. Día)' : ''}</span>
                 </span>
                 <span className="text-[10px] font-mono bg-indigo-500/15 px-1.5 py-0.5 rounded border border-indigo-500/30">
-                  {bcvEurPrice.toFixed(2)} Bs.
+                  {effectiveBcvEur.toFixed(2)} Bs.
                 </span>
               </div>
               <div className="text-xl sm:text-2xl font-black text-white font-mono my-2">

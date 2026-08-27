@@ -177,6 +177,73 @@ async function fetchDolarApiRates(): Promise<{
   }
 }
 
+import https from 'https';
+
+interface BCVScrapedData {
+  usd: number;
+  eur: number;
+  fechaValorIso: string;
+  fechaValorTexto: string;
+}
+
+async function fetchBCVDirect(): Promise<BCVScrapedData | null> {
+  return new Promise((resolve) => {
+    try {
+      const agent = new https.Agent({ rejectUnauthorized: false });
+      const req = https.get(
+        'https://www.bcv.org.ve/',
+        {
+          agent,
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          },
+          timeout: 7000,
+        },
+        (res) => {
+          let html = '';
+          res.on('data', (c) => (html += c));
+          res.on('end', () => {
+            try {
+              const dolarMatch = html.match(/id=\"dolar\"[\s\S]*?<strong[^>]*>\s*([\d,.]+)\s*<\/strong>/i);
+              const euroMatch = html.match(/id=\"euro\"[\s\S]*?<strong[^>]*>\s*([\d,.]+)\s*<\/strong>/i);
+              const dateMatch = html.match(
+                /<span class=\"date-display-single\"[^>]*content=\"([^\"]+)\"[^>]*>([\s\S]*?)<\/span>/i
+              );
+
+              const parseRate = (str?: string) =>
+                str ? parseFloat(str.replace(/\./g, '').replace(',', '.')) : 0;
+
+              const usd = parseRate(dolarMatch?.[1]);
+              const eur = parseRate(euroMatch?.[1]);
+              const fechaValorIso = dateMatch?.[1] || '';
+              const fechaValorTexto = dateMatch?.[2]?.replace(/\s+/g, ' ').trim() || '';
+
+              if (usd > 0) {
+                resolve({ usd, eur, fechaValorIso, fechaValorTexto });
+              } else {
+                resolve(null);
+              }
+            } catch {
+              resolve(null);
+            }
+          });
+        }
+      );
+
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -185,10 +252,11 @@ export async function GET(req: Request) {
       ? payTypesParam.split(',').map((s) => s.trim()).filter(Boolean)
       : [];
 
-    const [dolarApiData, p2pBuy, p2pSell] = await Promise.all([
+    const [dolarApiData, p2pBuy, p2pSell, bcvDirect] = await Promise.all([
       fetchDolarApiRates(),
       fetchBinanceP2P('BUY', payTypes),
       fetchBinanceP2P('SELL', payTypes),
+      fetchBCVDirect(),
     ]);
 
     const defaultDate = new Date().toISOString();
@@ -197,7 +265,7 @@ export async function GET(req: Request) {
       moneda: 'USD',
       fuente: 'oficial',
       nombre: 'Dólar BCV',
-      promedio: 780.0,
+      promedio: bcvDirect?.usd || 787.52,
       fechaActualizacion: defaultDate,
     };
 
@@ -205,9 +273,32 @@ export async function GET(req: Request) {
       moneda: 'EUR',
       fuente: 'oficial',
       nombre: 'Euro BCV',
-      promedio: 911.0,
+      promedio: bcvDirect?.eur || 919.15,
       fechaActualizacion: defaultDate,
     };
+
+    let nextBusinessDay: any = undefined;
+
+    if (bcvDirect && bcvDirect.usd > 0) {
+      const diffUsd = bcvDirect.usd - usdOficial.promedio;
+      const diffEur = bcvDirect.eur - eurOficial.promedio;
+      const diffUsdPct = usdOficial.promedio > 0 ? (diffUsd / usdOficial.promedio) * 100 : 0;
+      const diffEurPct = eurOficial.promedio > 0 ? (diffEur / eurOficial.promedio) * 100 : 0;
+
+      const isAnnounced = Math.abs(diffUsd) > 0.001 || (Boolean(bcvDirect.fechaValorIso) && bcvDirect.fechaValorIso !== usdOficial.fechaActualizacion);
+
+      nextBusinessDay = {
+        isAnnounced,
+        fechaValorTexto: bcvDirect.fechaValorTexto,
+        fechaValorIso: bcvDirect.fechaValorIso,
+        usd: bcvDirect.usd,
+        eur: bcvDirect.eur,
+        diffUsd,
+        diffEur,
+        diffUsdPct,
+        diffEurPct,
+      };
+    }
 
     const bcvUsdRate = usdOficial.promedio;
     const p2pBuyAvg = p2pBuy.average;
@@ -230,6 +321,7 @@ export async function GET(req: Request) {
       bcv: {
         usd: usdOficial,
         eur: eurOficial,
+        nextBusinessDay,
       },
       paralelo: {
         usd: dolarApiData.usdParalelo,

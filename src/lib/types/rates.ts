@@ -27,11 +27,24 @@ export interface P2PTradeSummary {
   isFallback?: boolean;
 }
 
+export interface BCVNextBusinessDay {
+  isAnnounced: boolean;
+  fechaValorTexto: string;
+  fechaValorIso: string;
+  usd: number;
+  eur: number;
+  diffUsd: number;
+  diffEur: number;
+  diffUsdPct: number;
+  diffEurPct: number;
+}
+
 export interface MarketRatesData {
   timestamp: string;
   bcv: {
     usd: RateItem;
     eur: RateItem;
+    nextBusinessDay?: BCVNextBusinessDay;
   };
   paralelo?: {
     usd?: RateItem;
